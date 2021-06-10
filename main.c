@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <assert.h>
+#include <stdlib.h>
 
 
 #define NAME_SIZE 100
 #define BLOCK_SIZE 512
 #define PART_SIZE (BLOCK_SIZE/ sizeof(long long))
+#define ONE 1
 
 
-struct posix_header {                              /* byte offset */
+typedef struct {                              /* byte offset */
     char name[100];               /*   0 */
     char mode[8];                 /* 100 */
     char uid[8];                  /* 108 */
@@ -25,26 +28,63 @@ struct posix_header {                              /* byte offset */
     char devminor[8];             /* 337 */
     char prefix[155];             /* 345 */
     /* 500 */
+} posix_header;
+
+enum YesNoEOF {
+    YES,
+    NO,
+    END_OF_FILE,
 };
 
 /**
  * Check if one BLOCK_SIZEd block has content.
  * @param file_handle File to read block from.
  * @return
- * 0: No content was read.
- * Else: Some content was read;
+ * True: Some content was read.
+ * False: Some content was read;
  */
-unsigned long long read_block_for_content(FILE *file_handle) {
+enum YesNoEOF was_content_in_block(FILE *file_handle) {
     unsigned long long content = 0;
     // Read 512 block - one small part at a time to tell if its empty
-    int how_many_times = PART_SIZE;
+    unsigned long long tmp_content;
+    int how_many_times = BLOCK_SIZE / sizeof(tmp_content);
     while (how_many_times > 0) {
-        unsigned long long tmp_content;
-        fread(&tmp_content, PART_SIZE, 1, file_handle);
+        size_t num_of_suc_read_elements = fread(&tmp_content, sizeof(tmp_content), 1, file_handle);
+        // TODO EOF was reached
+        if (num_of_suc_read_elements != 1) {
+            return END_OF_FILE;
+        }
         --how_many_times;
         content |= tmp_content;
     }
-    return content;
+    return content == 0 ? NO : YES;
+}
+
+/**
+ * Read till we find 2 empty blocks od EOF.
+ * @param file_handle File to read from.
+ * @return
+ * False: EOF was encountered.
+ * True: Everything went ok.
+ */
+bool read_till_two_empty_blocks(FILE *file_handle) {
+    // TODO: Have some enum later to tell if 2 blocks were without content.
+    // Check for 2 empty blocks.
+    int blocks_without_content = 0;
+    while (blocks_without_content < 2) {
+        switch (was_content_in_block(file_handle)) {
+            case YES:
+                // zero out content and block count
+                blocks_without_content = 0;
+                break;
+            case NO:
+                ++blocks_without_content;
+                break;
+            case END_OF_FILE:
+                return false;
+        }
+    }
+    return true;
 }
 
 int main(int argc, char *argv[]) {
@@ -54,40 +94,28 @@ int main(int argc, char *argv[]) {
     }
     // Open a tar file.
     FILE *tar_file = fopen(argv[1], "rb");
+    // Malloc space for header
+    posix_header *header = malloc(sizeof (posix_header));
 
-    // Read name of the first file there.
-    char name[NAME_SIZE];
-    fgets(name, NAME_SIZE, tar_file);
-    printf("%s\n", name);
+    size_t result = fread(header, sizeof(*header),ONE,tar_file);
+    // TODO: something went wrong.
+    if (result != ONE) return 2;
 
-    // Seek to second block.
-    int was_successful = fseek(tar_file, BLOCK_SIZE, SEEK_SET);
+    // TODO: lot more to do.
 
 
-    // Have some enum later to tell if 2 blocks were without content.
-    int blocks_without_content = 0;
-    unsigned long long content = 0;
-    while (blocks_without_content != 2){
-        content |= read_block_for_content(tar_file);
-        if (content == 0){
-            ++blocks_without_content;
-        } else{
-            // zero out content
-            content = 0;
+    while (true) {
+        // Read name of the first file there.
+        char name[NAME_SIZE];
+        fgets(name, NAME_SIZE, tar_file);
+        printf("%s\n", name);
+
+        // Seek to size.
+        int was_successful = fseek(tar_file, BLOCK_SIZE - NAME_SIZE, SEEK_CUR);
+        assert(was_successful == 0);
+
+        if (!read_till_two_empty_blocks(tar_file)) {
+            return 0;
         }
     }
-
-    bool block_read_flag = false;
-
-
-
-
-
-    // If 2 consecutive blocks empty read another name
-
-    // Repeat.
-
-
-
-    return 0;
 }
