@@ -36,9 +36,13 @@ enum YesNoEOF {
     END_OF_FILE,
 };
 
-inline int number_of_content_blocks(char size_as_string[]) {
+size_t number_of_content_blocks(char size_as_string[]) {
     long size_as_long = strtol(size_as_string, NULL, OCTAL);
-    return (size_as_long / BLOCK_SIZE) + ((size_as_long % BLOCK_SIZE == 0) ? 0 : 1);
+    // Size should never be negative.
+    assert(size_as_long > 0);
+
+    size_t size = (size_t) size_as_long;
+    return (size / BLOCK_SIZE) + ((size % BLOCK_SIZE == 0) ? 0 : 1);
 }
 
 /**
@@ -76,16 +80,26 @@ int main(int argc, char *argv[]) {
     posix_header *header = malloc(sizeof(posix_header));
 
     while (true) {
-        size_t result = fread(header, sizeof(*header), ONE, tar_file);
+        // Read header
+        size_t header_read_res = fread(header, sizeof(*header), ONE, tar_file);
+        // Ship to 512B
+        int skip_res = fseek(tar_file, BLOCK_SIZE - sizeof(*header), SEEK_CUR);
         // TODO: something went wrong.
-        if (result != ONE) return 2;
+        if (header_read_res != ONE || skip_res != 0) return 2;
 
         // TODO check that name is in the list.
 
         printf(header->name);
 
         // get and skip all the content
-        int blocks_to_skip = number_of_content_blocks(header->size);
+        size_t blocks_to_skip = number_of_content_blocks(header->size);
+
+        size_t skipped_content = fread(header, BLOCK_SIZE, blocks_to_skip, tar_file);
+        // We reached the EOF sooner than we should.
+        if(skipped_content != blocks_to_skip) {
+            // TODO: do more here.
+            return 2;
+        }
 
     }
 }
