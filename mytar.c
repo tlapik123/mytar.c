@@ -6,11 +6,11 @@
 
 #define NAME_SIZE 100
 #define BLOCK_SIZE 512
-#define PART_SIZE (BLOCK_SIZE/ sizeof(long long))
+#define OCTAL 8
 #define ONE 1
 
 
-typedef struct {                              /* byte offset */
+typedef struct {                  /* byte offset */
     char name[100];               /*   0 */
     char mode[8];                 /* 100 */
     char uid[8];                  /* 108 */
@@ -36,6 +36,11 @@ enum YesNoEOF {
     END_OF_FILE,
 };
 
+inline int number_of_content_blocks(char size_as_string[]) {
+    long size_as_long = strtol(size_as_string, NULL, OCTAL);
+    return (size_as_long / BLOCK_SIZE) + ((size_as_long % BLOCK_SIZE == 0) ? 0 : 1);
+}
+
 /**
  * Check if one BLOCK_SIZEd block has content.
  * @param file_handle File to read block from.
@@ -60,33 +65,6 @@ enum YesNoEOF was_content_in_block(FILE *file_handle) {
     return content == 0 ? NO : YES;
 }
 
-/**
- * Read till we find 2 empty blocks od EOF.
- * @param file_handle File to read from.
- * @return
- * False: EOF was encountered.
- * True: Everything went ok.
- */
-bool read_till_two_empty_blocks(FILE *file_handle) {
-    // TODO: Have some enum later to tell if 2 blocks were without content.
-    // Check for 2 empty blocks.
-    int blocks_without_content = 0;
-    while (blocks_without_content < 2) {
-        switch (was_content_in_block(file_handle)) {
-            case YES:
-                // zero out content and block count
-                blocks_without_content = 0;
-                break;
-            case NO:
-                ++blocks_without_content;
-                break;
-            case END_OF_FILE:
-                return false;
-        }
-    }
-    return true;
-}
-
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("No arguments were supplied\n");
@@ -95,27 +73,19 @@ int main(int argc, char *argv[]) {
     // Open a tar file.
     FILE *tar_file = fopen(argv[1], "rb");
     // Malloc space for header
-    posix_header *header = malloc(sizeof (posix_header));
-
-    size_t result = fread(header, sizeof(*header),ONE,tar_file);
-    // TODO: something went wrong.
-    if (result != ONE) return 2;
-
-    // TODO: lot more to do.
-
+    posix_header *header = malloc(sizeof(posix_header));
 
     while (true) {
-        // Read name of the first file there.
-        char name[NAME_SIZE];
-        fgets(name, NAME_SIZE, tar_file);
-        printf("%s\n", name);
+        size_t result = fread(header, sizeof(*header), ONE, tar_file);
+        // TODO: something went wrong.
+        if (result != ONE) return 2;
 
-        // Seek to size.
-        int was_successful = fseek(tar_file, BLOCK_SIZE - NAME_SIZE, SEEK_CUR);
-        assert(was_successful == 0);
+        // TODO check that name is in the list.
 
-        if (!read_till_two_empty_blocks(tar_file)) {
-            return 0;
-        }
+        printf(header->name);
+
+        // get and skip all the content
+        int blocks_to_skip = number_of_content_blocks(header->size);
+
     }
 }
