@@ -2,12 +2,13 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 
-#define NAME_SIZE 100
 #define BLOCK_SIZE 512
 #define OCTAL 8
 #define ONE 1
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 
 typedef struct {                    /* byte offset */
@@ -30,12 +31,6 @@ typedef struct {                    /* byte offset */
     char empty[12];                 /* 500 */
     /* 512 */
 } whole_header;
-
-enum YesNoEOF {
-    YES,
-    NO,
-    END_OF_FILE,
-};
 
 size_t number_of_content_blocks(char size_as_string[]) {
     long size_as_long = strtol(size_as_string, NULL, OCTAL);
@@ -60,44 +55,67 @@ bool is_block_empty(void *block) {
         ++part;
         --repeat_count;
     }
-    return result;
+    return result == 0 ? true : false;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("No arguments were supplied\n");
-        return 1;
+    if (argc < 3) {
+        printf("Wrong number of args given.");
+        return 2;
     }
+    // TODO: whole lot of checking the args.
+
+    // TODO: repair this.
+    char *filename = argv[1];
+    char *(files_to_check_for[argc - 2]);
+    bool appearance[argc - 2];
+
+    for (int i = 2; i < argc; ++i) {
+        files_to_check_for[i-2] = argv[i];
+        appearance[i-2] = false;
+    }
+
     // Open a tar file.
-    FILE *tar_file = fopen(argv[1], "rb");
+    FILE *tar_file = fopen(filename, "rb");
     // Malloc space for header
     whole_header *header = malloc(sizeof(whole_header));
 
     // Number of empty blocks encountered.
     int empty_block_count = 0;
     while (true) {
+        // We found end of archive.
+        if (empty_block_count == 2) {
+            break;
+        }
         // Read header
         size_t header_read_res = fread(header, sizeof(*header), ONE, tar_file);
         // TODO: something went wrong. + check empty block rules
-        if (header_read_res != ONE) return 2;
+        if (header_read_res != ONE) return 21;
 
         // Optimization - only if name is empty we check if block was empty.
         if (header->name[0] == '\0') {
-            if(is_block_empty(header)) {
+            if (is_block_empty(header)) {
                 ++empty_block_count;
                 continue;
             }
             // TODO: no name and empty block shouldn't happen.
-            return 2;
+            return 22;
         }
 
         // TODO: we encountered empty block but there wasn't a second one of EOF
-        if(empty_block_count != 0){
-            return 2;
+        if (empty_block_count != 0) {
+            return 23;
         }
         // TODO check that name is in the list.
-
-        printf("%s\n", header->name);
+        for (size_t i = 0; i < ARRAY_SIZE(files_to_check_for); ++i) {
+            // we found a match.
+            if (strcmp(header->name, files_to_check_for[i]) == 0) {
+                appearance[i] = true;
+                printf("%s\n", header->name);
+                // TODO: should there be a break?
+                break;
+            }
+        }
 
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
@@ -106,7 +124,12 @@ int main(int argc, char *argv[]) {
         // We reached the EOF sooner than we should.
         if (skipped_content != blocks_to_skip) {
             // TODO: do more here.
-            return 2;
+            return 24;
+        }
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
+        if (!appearance[i]) {
+            printf("%s - was not found.\n", files_to_check_for[i]);
         }
     }
 }
