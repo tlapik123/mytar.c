@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     if (argc < 4) {
         my_errx(2, "Need at least 3 arguments.");
     }
-    char *filename;
+    char *filename = NULL;
     // Current active option.
     enum active_option active_o = NONE;
     // 0th index:'f', 1st index:'t'
@@ -110,6 +110,8 @@ int main(int argc, char *argv[]) {
         switch (active_o) {
             case F:
                 filename = argv[i];
+                // If there was a 't' switch back to it.
+                active_o = encountered_options[1] ? T : NONE;
                 break;
             case T:
                 // Add search name to the list.
@@ -121,7 +123,7 @@ int main(int argc, char *argv[]) {
                 my_errx(2, "Option not implemented.");
                 assert(false);
             case NONE:
-                my_errx(2, "Option needs to be specified!");
+                my_errx(2, "Option missing!");
                 assert(false);
         }
     }
