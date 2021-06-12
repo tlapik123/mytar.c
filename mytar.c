@@ -83,11 +83,11 @@ int main(int argc, char *argv[]) {
     // Current active option.
     enum active_option active_o = NONE;
     // 0th index:'f', 1st index:'t'
-    char option_decoder[] = {'f', 't'};
+    // char option_decoder[] = {'f', 't'};
     bool encountered_options[SUPPORTED_OPTION_COUNT] = {false};
     // 't' option files
     const char *t_names[argc - 3];
-    int t_names_curr_index = 0;
+    int t_names_actual_length = 0;
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
             if (strlen(argv[i]) != 2) my_errx(2, "Long option encountered.");
@@ -112,8 +112,8 @@ int main(int argc, char *argv[]) {
                 break;
             case T:
                 // Add search name to the list.
-                t_names[t_names_curr_index] = argv[i];
-                ++t_names_curr_index;
+                t_names[t_names_actual_length] = argv[i];
+                ++t_names_actual_length;
                 break;
             case V:
             case X:
@@ -125,12 +125,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    bool appearance[argc - 2];
-
-    for (int i = 2; i < argc; ++i) {
-        t_names[i - 2] = argv[i];
-        appearance[i - 2] = false;
-    }
+    bool appearance[t_names_actual_length];
 
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
@@ -171,7 +166,7 @@ int main(int argc, char *argv[]) {
             return 23;
         }
         // TODO check that name is in the list.
-        for (size_t i = 0; i < ARRAY_SIZE(t_names); ++i) {
+        for (int i = 0; i < t_names_actual_length; ++i) {
             // we found a match.
             if (strcmp(header->name, t_names[i]) == 0) {
                 appearance[i] = true;
