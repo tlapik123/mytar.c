@@ -187,6 +187,13 @@ int main(int argc, char *argv[]) {
             my_errx(0, "A lone zero block encountered.\n");
         }
 
+        // We only care about regular files.
+        if(header->typeflag != 0){
+            free(header);
+            fclose(tar_file);
+            my_errx(0, "Non regular file encountered.\n");
+        }
+
         if (t_names_actual_length != 0) {
             // Check that name is in the list.
             // TODO: do this in function.
