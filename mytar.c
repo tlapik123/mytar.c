@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
         }
 
         // We only care about regular files.
-        if(header->typeflag != 0){
+        if(header->typeflag != '0'){
             free(header);
             fclose(tar_file);
             my_errx(2, "Non regular file encountered.\n");
