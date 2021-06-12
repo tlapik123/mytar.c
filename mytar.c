@@ -39,7 +39,7 @@ typedef struct {                    /* byte offset */
 size_t number_of_content_blocks(char size_as_string[]) {
     long size_as_long = strtol(size_as_string, NULL, OCTAL);
     // Size should never be negative.
-    assert(size_as_long > 0);
+    assert(size_as_long >= 0);
 
     size_t size = (size_t) size_as_long;
     return (size / BLOCK_SIZE) + ((size % BLOCK_SIZE == 0) ? 0 : 1);
