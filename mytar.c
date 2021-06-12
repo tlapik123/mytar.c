@@ -139,11 +139,13 @@ int main(int argc, char *argv[]) {
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
     // Some problem with file.
-    if(tar_file == NULL){
-        my_errx(2, "File couldn't be opened/wasn't found.");
-    }
+    if (tar_file == NULL) my_errx(2, "File couldn't be opened/wasn't found.");
     // Malloc space for header
     whole_header *header = malloc(sizeof(whole_header));
+    if (header == NULL) {
+        fclose(tar_file);
+        my_errx(2, "Malloc returned NULL.");
+    }
 
     // Number of empty blocks encountered.
     int empty_block_count = 0;
