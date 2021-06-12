@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     if (argc < 4) {
         my_errx(2, "Need at least 3 arguments.");
     }
-    char *filename = argv[1];
+    char *filename;
     // Current active option.
     enum active_option active_o = NONE;
     // 0th index:'f', 1st index:'t'
@@ -138,7 +138,6 @@ int main(int argc, char *argv[]) {
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
     // Malloc space for header
-    // TODO do free.
     whole_header *header = malloc(sizeof(whole_header));
 
     // Number of empty blocks encountered.
@@ -201,9 +200,9 @@ int main(int argc, char *argv[]) {
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
 
-        size_t skipped_content = fread(header, BLOCK_SIZE, blocks_to_skip, tar_file);
+        int skipped_res = fseek(tar_file, (long)(BLOCK_SIZE*blocks_to_skip), SEEK_CUR);
         // We reached the EOF sooner than we should.
-        if (skipped_content != blocks_to_skip) {
+        if (skipped_res != 0) {
             // TODO: hopefully right?
             free(header);
             fclose(tar_file);
