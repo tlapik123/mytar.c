@@ -69,7 +69,6 @@ bool is_block_empty(void *block) {
 }
 
 
-
 enum active_option {
     NONE,
     F,
@@ -130,7 +129,7 @@ int main(int argc, char *argv[]) {
 
     // Check option dependency
     for (size_t i = 0; i < ARRAY_SIZE(encountered_options); ++i) {
-        if(!encountered_options[i]){
+        if (!encountered_options[i]) {
             my_errx(2, "Some option wasn't specified.");
         }
     }
@@ -182,7 +181,7 @@ int main(int argc, char *argv[]) {
             my_errx(0, "A lone zero block encountered.");
         }
 
-        if(t_names_actual_length != 0) {
+        if (t_names_actual_length != 0) {
             // Check that name is in the list.
             // TODO: do this in function.
             for (int i = 0; i < t_names_actual_length; ++i) {
@@ -202,7 +201,7 @@ int main(int argc, char *argv[]) {
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
 
-        int skipped_res = fseek(tar_file, (long)(BLOCK_SIZE*blocks_to_skip), SEEK_CUR);
+        int skipped_res = fseek(tar_file, (long) (BLOCK_SIZE * blocks_to_skip), SEEK_CUR);
         // We reached the EOF sooner than we should.
         if (skipped_res != 0) {
             // TODO: hopefully right?
@@ -211,11 +210,14 @@ int main(int argc, char *argv[]) {
             my_errx(2, "Unexpected EOF in archive");
         }
     }
+    bool all_files_found = true;
     for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
         if (!appearance[i]) {
             printf("%s - was not found.\n", t_names[i]);
+            all_files_found = false;
         }
     }
     free(header);
     fclose(tar_file);
+    if (!all_files_found) my_errx(2, "Exiting with failure status due to previous errors");
 }
