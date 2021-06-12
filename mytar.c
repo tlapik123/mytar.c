@@ -215,4 +215,6 @@ int main(int argc, char *argv[]) {
             printf("%s - was not found.\n", t_names[i]);
         }
     }
+    free(header);
+    fclose(tar_file);
 }
