@@ -9,8 +9,12 @@
 #define OCTAL 8
 #define ONE 1
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#define SUPPORTED_OPTION_COUNT 2
 
 
+/**
+ * Header struct.
+ */
 typedef struct {                    /* byte offset */
     char name[100];                 /*   0 */
     char mode[8];                   /* 100 */
@@ -41,6 +45,11 @@ size_t number_of_content_blocks(char size_as_string[]) {
     return (size / BLOCK_SIZE) + ((size % BLOCK_SIZE == 0) ? 0 : 1);
 }
 
+void my_errx(int return_code, char return_string[]) {
+    printf(return_string);
+    exit(return_code);
+}
+
 
 bool is_block_empty(void *block) {
     unsigned long long result = 0;
@@ -58,26 +67,75 @@ bool is_block_empty(void *block) {
     return result == 0 ? true : false;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        printf("Wrong number of args given.");
-        return 2;
-    }
-    // TODO: whole lot of checking the args.
+enum active_option {
+    NONE,
+    F,
+    T,
+    V,
+    X
+};
 
-    // TODO: repair this.
+int main(int argc, char *argv[]) {
+    if (argc < 4) {
+        my_errx(2, "Need at least 3 arguments.");
+    }
     char *filename = argv[1];
-    char *(files_to_check_for[argc - 2]);
+    // Current active option.
+    enum active_option active_o = NONE;
+    // 0th index:'f', 1st index:'t'
+    char option_decoder[] = {'f', 't'};
+    bool encountered_options[SUPPORTED_OPTION_COUNT] = {false};
+    // 't' option files
+    const char *t_names[argc - 3];
+    int t_names_curr_index = 0;
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i][0] == '-') {
+            if (strlen(argv[i]) != 2) my_errx(2, "Long option encountered.");
+            switch (argv[i][1]) {
+                case 'f':
+                    encountered_options[0] = true;
+                    active_o = F;
+                    continue;
+                case 't':
+                    encountered_options[1] = true;
+                    active_o = T;
+                    continue;
+                default:
+                    my_errx(2, "Unknown option.");
+                    // We should never get here.
+                    assert(false);
+            }
+        }
+        switch (active_o) {
+            case F:
+                filename = argv[i];
+                break;
+            case T:
+                // Add search name to the list.
+                t_names[t_names_curr_index] = argv[i];
+                ++t_names_curr_index;
+                break;
+            case V:
+            case X:
+                my_errx(2, "Option not implemented.");
+                assert(false);
+            case NONE:
+                my_errx(2, "Option needs to be specified!");
+                assert(false);
+        }
+    }
+
     bool appearance[argc - 2];
 
     for (int i = 2; i < argc; ++i) {
-        files_to_check_for[i-2] = argv[i];
-        appearance[i-2] = false;
+        t_names[i - 2] = argv[i];
+        appearance[i - 2] = false;
     }
 
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
     // Malloc space for header
+    // TODO do free.
     whole_header *header = malloc(sizeof(whole_header));
 
     // Number of empty blocks encountered.
@@ -90,7 +148,13 @@ int main(int argc, char *argv[]) {
         // Read header
         size_t header_read_res = fread(header, sizeof(*header), ONE, tar_file);
         // TODO: something went wrong. + check empty block rules
-        if (header_read_res != ONE) return 21;
+        if (header_read_res != ONE) {
+            // We reached EOF and there was only one empty block.
+            if (empty_block_count != 0) {
+                return 24;
+            }
+            return 21;
+        }
 
         // Optimization - only if name is empty we check if block was empty.
         if (header->name[0] == '\0') {
@@ -102,14 +166,14 @@ int main(int argc, char *argv[]) {
             return 22;
         }
 
-        // TODO: we encountered empty block but there wasn't a second one of EOF
+        // TODO: we encountered empty block but there wasn't a second one or EOF
         if (empty_block_count != 0) {
             return 23;
         }
         // TODO check that name is in the list.
-        for (size_t i = 0; i < ARRAY_SIZE(files_to_check_for); ++i) {
+        for (size_t i = 0; i < ARRAY_SIZE(t_names); ++i) {
             // we found a match.
-            if (strcmp(header->name, files_to_check_for[i]) == 0) {
+            if (strcmp(header->name, t_names[i]) == 0) {
                 appearance[i] = true;
                 printf("%s\n", header->name);
                 // TODO: should there be a break?
@@ -129,7 +193,7 @@ int main(int argc, char *argv[]) {
     }
     for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
         if (!appearance[i]) {
-            printf("%s - was not found.\n", files_to_check_for[i]);
+            printf("%s - was not found.\n", t_names[i]);
         }
     }
 }
