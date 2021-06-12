@@ -125,6 +125,14 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Check option dependency
+    for (size_t i = 0; i < ARRAY_SIZE(encountered_options); ++i) {
+        if(!encountered_options[i]){
+            my_errx(2, "Some option wasn't specified.");
+            assert(false);
+        }
+    }
+
     bool appearance[t_names_actual_length];
 
     // Open a tar file.
@@ -142,13 +150,18 @@ int main(int argc, char *argv[]) {
         }
         // Read header
         size_t header_read_res = fread(header, sizeof(*header), ONE, tar_file);
-        // TODO: something went wrong. + check empty block rules
         if (header_read_res != ONE) {
             // We reached EOF and there was only one empty block.
             if (empty_block_count != 0) {
-                return 24;
+                free(header);
+                fclose(tar_file);
+                my_errx(0, "Only one empty block found!");
+                assert(false);
             }
-            return 21;
+            free(header);
+            fclose(tar_file);
+            my_errx(2, "Unexpected EOF in archive!");
+            assert(false);
         }
 
         // Optimization - only if name is empty we check if block was empty.
@@ -157,15 +170,21 @@ int main(int argc, char *argv[]) {
                 ++empty_block_count;
                 continue;
             }
-            // TODO: no name and empty block shouldn't happen.
-            return 22;
+            free(header);
+            fclose(tar_file);
+            my_errx(2, "Non recognizable header.");
+            assert(false);
         }
 
         // TODO: we encountered empty block but there wasn't a second one or EOF
         if (empty_block_count != 0) {
-            return 23;
+            // TODO: should we return?
+            free(header);
+            fclose(tar_file);
+            my_errx(0, "A lone zero block encountered.");
+            assert(false);
         }
-        // TODO check that name is in the list.
+        // Check that name is in the list.
         for (int i = 0; i < t_names_actual_length; ++i) {
             // we found a match.
             if (strcmp(header->name, t_names[i]) == 0) {
@@ -182,8 +201,11 @@ int main(int argc, char *argv[]) {
         size_t skipped_content = fread(header, BLOCK_SIZE, blocks_to_skip, tar_file);
         // We reached the EOF sooner than we should.
         if (skipped_content != blocks_to_skip) {
-            // TODO: do more here.
-            return 24;
+            // TODO: hopefully right?
+            free(header);
+            fclose(tar_file);
+            my_errx(2, "Unexpected EOF in archive");
+            assert(false);
         }
     }
     for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
