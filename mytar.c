@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
         if(header->typeflag != 0){
             free(header);
             fclose(tar_file);
-            my_errx(0, "Non regular file encountered.\n");
+            my_errx(2, "Non regular file encountered.\n");
         }
 
         if (t_names_actual_length != 0) {
