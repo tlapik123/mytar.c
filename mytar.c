@@ -79,7 +79,7 @@ enum active_option {
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
-        my_errx(2, "Need at least 3 arguments.");
+        my_errx(2, "Need at least 3 arguments.\n");
     }
     char *filename = NULL;
     // Current active option.
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
-            if (strlen(argv[i]) != 2) my_errx(2, "Long option encountered.");
+            if (strlen(argv[i]) != 2) my_errx(2, "Long option encountered.\n");
             switch (argv[i][1]) {
                 case 'f':
                     encountered_options[0] = true;
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
                     active_o = T;
                     continue;
                 default:
-                    my_errx(2, "Unknown option.");
+                    my_errx(2, "Unknown option.\n");
             }
         }
         switch (active_o) {
@@ -119,10 +119,10 @@ int main(int argc, char *argv[]) {
                 break;
             case V:
             case X:
-                my_errx(2, "Option not implemented.");
+                my_errx(2, "Option not implemented.\n");
                 assert(false);
             case NONE:
-                my_errx(2, "Option missing!");
+                my_errx(2, "Option missing!\n");
                 assert(false);
         }
     }
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
     // Check option dependency
     for (size_t i = 0; i < ARRAY_SIZE(encountered_options); ++i) {
         if (!encountered_options[i]) {
-            my_errx(2, "Some option wasn't specified.");
+            my_errx(2, "Some option wasn't specified.\n");
         }
     }
 
@@ -139,12 +139,12 @@ int main(int argc, char *argv[]) {
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
     // Some problem with file.
-    if (tar_file == NULL) my_errx(2, "File couldn't be opened/wasn't found.");
+    if (tar_file == NULL) my_errx(2, "File couldn't be opened/wasn't found.\n");
     // Malloc space for header
     whole_header *header = malloc(sizeof(whole_header));
     if (header == NULL) {
         fclose(tar_file);
-        my_errx(2, "Malloc returned NULL.");
+        my_errx(2, "Malloc returned NULL.\n");
     }
 
     // Number of empty blocks encountered.
@@ -161,11 +161,11 @@ int main(int argc, char *argv[]) {
             if (empty_block_count != 0) {
                 free(header);
                 fclose(tar_file);
-                my_errx(0, "Only one empty block found!");
+                my_errx(0, "Only one empty block found!\n");
             }
             free(header);
             fclose(tar_file);
-            my_errx(2, "Unexpected EOF in archive!");
+            my_errx(2, "Unexpected EOF in archive!\n");
         }
 
         // Optimization - only if name is empty we check if block was empty.
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
             }
             free(header);
             fclose(tar_file);
-            my_errx(2, "Non recognizable header.");
+            my_errx(2, "Non recognizable header.\n");
         }
 
         // TODO: we encountered empty block but there wasn't a second one or EOF
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
             // TODO: should we return?
             free(header);
             fclose(tar_file);
-            my_errx(0, "A lone zero block encountered.");
+            my_errx(0, "A lone zero block encountered.\n");
         }
 
         if (t_names_actual_length != 0) {
@@ -213,17 +213,17 @@ int main(int argc, char *argv[]) {
             // TODO: hopefully right?
             free(header);
             fclose(tar_file);
-            my_errx(2, "Unexpected EOF in archive");
+            my_errx(2, "Unexpected EOF in archive\n");
         }
     }
     bool all_files_found = true;
     for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
         if (!appearance[i]) {
-            printf("%s - was not found.\n", t_names[i]);
+            printf("mytar: %s: Not found in archive\n", t_names[i]);
             all_files_found = false;
         }
     }
     free(header);
     fclose(tar_file);
-    if (!all_files_found) my_errx(2, "Exiting with failure status due to previous errors");
+    if (!all_files_found) my_errx(2, "mytar: Exiting with failure status due to previous errors\n");
 }
