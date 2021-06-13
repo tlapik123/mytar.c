@@ -235,11 +235,13 @@ int main(int argc, char *argv[]) {
 
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
+        size_t size_to_skip = BLOCK_SIZE * blocks_to_skip;
 
-        char tmp_block[BLOCK_SIZE * blocks_to_skip];
-        size_t skipped_res = fread(tmp_block, (BLOCK_SIZE * blocks_to_skip), ONE, tar_file);
+        // Need some variable to read to.
+        char tmp_block[size_to_skip];
+        size_t skipped_res = fread(tmp_block, ONE, size_to_skip, tar_file);
         // We reached the EOF sooner than we should.
-        if (skipped_res != ONE) {
+        if (skipped_res != size_to_skip) {
             // TODO: hopefully right?
             free(header);
             fclose(tar_file);
