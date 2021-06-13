@@ -164,11 +164,11 @@ int main(int argc, char *argv[]) {
         if (empty_block_count == 2) {
             break;
         }
-        // We reached EOF without 2 empty blocks.
-        if (feof(tar_file)) break;
         // Read header
-        size_t header_read_res = fread(header, sizeof(*header), ONE, tar_file);
-        if (header_read_res != ONE) {
+        size_t header_read_res = fread(header, ONE, sizeof(*header), tar_file);
+        if (header_read_res != sizeof(*header)) {
+            // We reached EOF without 2 empty blocks.
+            if(header_read_res  == 0) break;
             // We reached EOF and there was only one empty block.
             if (empty_block_count != 0) {
                 free(header);
