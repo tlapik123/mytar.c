@@ -68,7 +68,7 @@ bool is_block_empty(void *block) {
     return result == 0 ? true : false;
 }
 
-int get_num_of_digits(long num){
+int get_num_of_digits(long num) {
     int digits = 0;
     while (num > 0) {
         ++digits;
@@ -164,6 +164,8 @@ int main(int argc, char *argv[]) {
         if (empty_block_count == 2) {
             break;
         }
+        // We reached EOF without 2 empty blocks.
+        if (feof(tar_file)) break;
         // Read header
         size_t header_read_res = fread(header, sizeof(*header), ONE, tar_file);
         if (header_read_res != ONE) {
@@ -172,9 +174,9 @@ int main(int argc, char *argv[]) {
                 free(header);
                 fclose(tar_file);
                 const char *non_formatted = "mytar: A lone zero block at %zu\n";
-                const int formatted_len = (int) strlen(non_formatted) + get_num_of_digits((long)blocks_so_far);
+                const int formatted_len = (int) strlen(non_formatted) + get_num_of_digits((long) blocks_so_far);
                 char formatted[formatted_len];
-                sprintf(formatted, non_formatted, (blocks_so_far+1));
+                sprintf(formatted, non_formatted, (blocks_so_far + 1));
                 my_errx(0, formatted);
             }
             free(header);
