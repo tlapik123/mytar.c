@@ -191,7 +191,12 @@ int main(int argc, char *argv[]) {
         if(header->typeflag != '0'){
             free(header);
             fclose(tar_file);
-            my_errx(2, "Non regular file encountered.\n");
+            const char* non_formatted = "mytar: Unsupported header type: %c\n";
+            const int formatted_len = (int)strlen(non_formatted)-1;
+            char formatted[formatted_len];
+            int res = sprintf(formatted,non_formatted, header->typeflag);
+            assert(res == formatted_len);
+            my_errx(2, formatted);
         }
 
         if (t_names_actual_length != 0) {
