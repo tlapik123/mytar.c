@@ -25,6 +25,11 @@ static bool is_block_empty(void *block);
 
 static void my_dispose(FILE *file_to_close, void *memory_to_free);
 
+static void
+parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[]);
+
+static inline bool is_name_in_list(const char *name, int array_end, const char *names[], bool appearances[]);
+
 /**
  * Header struct.
  */
@@ -190,14 +195,37 @@ parse_options(int argc, char *argv[], const char **filename, int *t_names_actual
     }
 }
 
+/**
+ * Checks if the string is in list.
+ * @param name Name to check for.
+ * @param array_end Length to check.
+ * @param names Array to check in.
+ * @param appearances Array (with at least array_end size) to note the appearance to.
+ * @return
+ * false: Name not found.
+ * true: Name was found.
+ */
+static inline bool is_name_in_list(const char *name, int array_end, const char *names[], bool appearances[]) {
+    // Check that name is in the list.
+    for (int i = 0; i < array_end; ++i) {
+        // we found a match.
+        if (strcmp(name, names[i]) == 0) {
+            appearances[i] = true;
+            return true;
+        }
+    }
+    return false;
+}
+
 
 int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
     const char *filename = NULL;
-    const char *t_names[argc - 3];
+    const char *t_names[argc];
+    // Parse options.
     parse_options(--argc, ++argv, &filename, &t_names_actual_length, t_names);
 
-    bool appearance[t_names_actual_length];
+
 
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
@@ -209,6 +237,9 @@ int main(int argc, char *argv[]) {
         fclose(tar_file);
         my_errx(2, "Malloc returned NULL.\n", 0);
     }
+
+    // Files that we found.
+    bool appearance[t_names_actual_length];
 
     // Number of empty blocks encountered.
     int empty_block_count = 0;
@@ -255,22 +286,10 @@ int main(int argc, char *argv[]) {
             my_errx(2, PROGRAM_NAME": Unsupported header type: %d\n", 1, header->typeflag);
         }
 
-        if (t_names_actual_length != 0) {
-            // Check that name is in the list.
-            // TODO: do this in function.
-            for (int i = 0; i < t_names_actual_length; ++i) {
-                // we found a match.
-                if (strcmp(header->name, t_names[i]) == 0) {
-                    appearance[i] = true;
-                    printf("%s\n", header->name);
-                    // TODO: should there be a break?
-                    break;
-                }
-            }
-        } else {
-            printf("%s\n", header->name);;;
+        // Find the name in 't' option list and if found (or list is nonexistent) print it.
+        if (t_names_actual_length == 0 || is_name_in_list(header->name, t_names_actual_length, t_names, appearance)) {
+            printf("%s\n", header->name);
         }
-
 
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
