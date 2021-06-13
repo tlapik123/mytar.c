@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
                 const char *non_formatted = "mytar: A lone zero block at %zu\n";
                 const int formatted_len = (int) strlen(non_formatted) + get_num_of_digits((long)blocks_so_far);
                 char formatted[formatted_len];
-                sprintf(formatted, non_formatted, blocks_so_far);
+                sprintf(formatted, non_formatted, (blocks_so_far+1));
                 my_errx(0, formatted);
             }
             free(header);
