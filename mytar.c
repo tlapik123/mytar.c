@@ -167,8 +167,6 @@ int main(int argc, char *argv[]) {
         // Read header
         size_t header_read_res = fread(header, ONE, sizeof(*header), tar_file);
         if (header_read_res != sizeof(*header)) {
-            // We reached EOF without 2 empty blocks.
-            if(header_read_res  == 0) break;
             // We reached EOF and there was only one empty block.
             if (empty_block_count != 0) {
                 free(header);
@@ -179,6 +177,9 @@ int main(int argc, char *argv[]) {
                 sprintf(formatted, non_formatted, (blocks_so_far + 1));
                 my_errx(0, formatted);
             }
+            // We reached EOF without 2 empty blocks.
+            if(header_read_res == 0) break;
+
             free(header);
             fclose(tar_file);
             my_errx(2, "mytar: Unexpected EOF in archive\n"
