@@ -188,13 +188,13 @@ int main(int argc, char *argv[]) {
         }
 
         // We only care about regular files.
-        if(header->typeflag != '0'){
+        if (header->typeflag != '0') {
             free(header);
             fclose(tar_file);
-            const char* non_formatted = "mytar: Unsupported header type: %c\n";
-            const int formatted_len = (int)strlen(non_formatted)-1;
+            const char *non_formatted = "mytar: Unsupported header type: %d\n";
+            const int formatted_len = (int) strlen(non_formatted) + 4;
             char formatted[formatted_len];
-            int res = sprintf(formatted,non_formatted, header->typeflag);
+            int res = sprintf(formatted, non_formatted, header->typeflag);
             assert(res == formatted_len);
             my_errx(2, formatted);
         }
