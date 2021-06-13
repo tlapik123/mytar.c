@@ -56,6 +56,11 @@ typedef struct {                    /* byte offset */
     /* 512 */
 } whole_header;
 
+/**
+ * Get number of content blocks.
+ * @param size_as_string Size of the archived file.
+ * @return Number of content blocks.
+ */
 static inline size_t number_of_content_blocks(char size_as_string[]) {
     size_t size_as_long = strtoul(size_as_string, NULL, OCTAL);
     return (size_as_long / BLOCK_SIZE) + ((size_as_long % BLOCK_SIZE == 0) ? 0 : 1);
@@ -75,6 +80,7 @@ static void my_errx(int return_code, char return_string[], int va_count, ...) {
     va_start(args, va_count);
     // print error message to stderr.
     vfprintf(stderr, return_string, args);
+    fflush(stderr);
     va_end(args);
     exit(return_code);
 }
@@ -225,6 +231,7 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
             all_files_found = false;
         }
     }
+    fflush(stderr);
     return all_files_found;
 }
 
@@ -235,8 +242,6 @@ int main(int argc, char *argv[]) {
     const char *t_names[argc];
     // Parse options.
     parse_options(--argc, ++argv, &filename, &t_names_actual_length, t_names);
-
-
 
     // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
@@ -304,6 +309,7 @@ int main(int argc, char *argv[]) {
         // Find the name in 't' option list and if found (or list is nonexistent) print it.
         if (t_names_actual_length == 0 || is_name_in_list(header->name, t_names_actual_length, t_names, appearance)) {
             printf("%s\n", header->name);
+            fflush(stdout);
         }
 
         // get and skip all the content
