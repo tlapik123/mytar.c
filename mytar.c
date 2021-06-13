@@ -68,6 +68,15 @@ bool is_block_empty(void *block) {
     return result == 0 ? true : false;
 }
 
+int get_num_of_digits(long num){
+    int digits = 0;
+    while (num > 0) {
+        ++digits;
+        num = num / 10;
+    }
+    return digits;
+}
+
 
 enum active_option {
     NONE,
@@ -149,6 +158,7 @@ int main(int argc, char *argv[]) {
 
     // Number of empty blocks encountered.
     int empty_block_count = 0;
+    size_t blocks_so_far = 0;
     while (true) {
         // We found end of archive.
         if (empty_block_count == 2) {
@@ -161,7 +171,11 @@ int main(int argc, char *argv[]) {
             if (empty_block_count != 0) {
                 free(header);
                 fclose(tar_file);
-                my_errx(0, "Only one empty block found!\n");
+                const char *non_formatted = "mytar: A lone zero block at %zu\n";
+                const int formatted_len = (int) strlen(non_formatted) + get_num_of_digits((long)blocks_so_far);
+                char formatted[formatted_len];
+                sprintf(formatted, non_formatted, blocks_so_far);
+                my_errx(0, formatted);
             }
             free(header);
             fclose(tar_file);
@@ -227,6 +241,7 @@ int main(int argc, char *argv[]) {
             fclose(tar_file);
             my_errx(2, "Unexpected EOF in archive\n");
         }
+        blocks_so_far += (blocks_to_skip + 1);
     }
     bool all_files_found = true;
     for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
