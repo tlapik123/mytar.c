@@ -102,16 +102,6 @@ static bool is_block_empty(void *block) {
     return result == 0 ? true : false;
 }
 
-// TODO: remove this.
-int get_num_of_digits(long num) {
-    int digits = 0;
-    while (num > 0) {
-        ++digits;
-        num = num / 10;
-    }
-    return digits;
-}
-
 /**
  * Closes the file and frees the memory.
  * @param file_to_close File in need of closing.
@@ -228,7 +218,7 @@ static inline bool is_name_in_list(const char *name, int array_end, const char *
  * false: One or more files were missing.
  */
 static inline bool check_appearance(size_t length, const bool appearance[], const char *t_names[]) {
-    bool all_files_found = true;;
+    bool all_files_found = true;
     for (size_t i = 0; i < length; ++i) {
         if (!appearance[i]) {
             fprintf(stderr, PROGRAM_NAME": %s: Not found in archive\n", t_names[i]);
@@ -306,8 +296,9 @@ int main(int argc, char *argv[]) {
 
         // We only care about regular files.
         if (header->typeflag != '0' && header->typeflag != 0) {
+            char type_flag = header->typeflag;
             my_dispose(tar_file, header);
-            my_errx(2, PROGRAM_NAME": Unsupported header type: %d\n", 1, header->typeflag);
+            my_errx(2, PROGRAM_NAME": Unsupported header type: %d\n", 1, type_flag);
         }
 
         // Find the name in 't' option list and if found (or list is nonexistent) print it.
