@@ -165,7 +165,8 @@ int main(int argc, char *argv[]) {
             }
             free(header);
             fclose(tar_file);
-            my_errx(2, "Unexpected EOF in archive!\n");
+            my_errx(2, "mytar: Unexpected EOF in archive\n"
+                       "mytar: Error is not recoverable: exiting now\n");
         }
 
         // Optimization - only if name is empty we check if block was empty.
