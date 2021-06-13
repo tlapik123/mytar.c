@@ -194,8 +194,7 @@ int main(int argc, char *argv[]) {
             const char *non_formatted = "mytar: Unsupported header type: %d\n";
             const int formatted_len = (int) strlen(non_formatted) + 4;
             char formatted[formatted_len];
-            int res = sprintf(formatted, non_formatted, header->typeflag);
-            assert(res == formatted_len);
+            sprintf(formatted, non_formatted, header->typeflag);
             my_errx(2, formatted);
         }
 
