@@ -30,6 +30,8 @@ parse_options(int argc, char *argv[], const char **filename, int *t_names_actual
 
 static inline bool is_name_in_list(const char *name, int array_end, const char *names[], bool appearances[]);
 
+static inline bool check_appearance(size_t length, const bool appearance[], const char *t_names[]);
+
 /**
  * Header struct.
  */
@@ -217,6 +219,25 @@ static inline bool is_name_in_list(const char *name, int array_end, const char *
     return false;
 }
 
+/**
+ * Check and print to stderr names that we didn't encounter.
+ * @param appearances Array saying what we encountered.
+ * @param t_names Names specified for searching.
+ * @return
+ * true: All of the files were found.
+ * false: One or more files were missing.
+ */
+static inline bool check_appearance(size_t length, const bool appearance[], const char *t_names[]) {
+    bool all_files_found = true;;
+    for (size_t i = 0; i < length; ++i) {
+        if (!appearance[i]) {
+            fprintf(stderr, PROGRAM_NAME": %s: Not found in archive\n", t_names[i]);
+            all_files_found = false;
+        }
+    }
+    return all_files_found;
+}
+
 
 int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
@@ -240,6 +261,9 @@ int main(int argc, char *argv[]) {
 
     // Files that we found.
     bool appearance[t_names_actual_length];
+    for (int i = 0; i < t_names_actual_length; ++i) {
+        appearance[i] = false;
+    }
 
     // Number of empty blocks encountered.
     int empty_block_count = 0;
@@ -306,13 +330,9 @@ int main(int argc, char *argv[]) {
         // Increment number of blocks encountered.
         blocks_so_far += (blocks_to_skip + 1);
     }
-    bool all_files_found = true;
-    for (size_t i = 0; i < ARRAY_SIZE(appearance); ++i) {
-        if (!appearance[i]) {
-            fprintf(stderr, PROGRAM_NAME": %s: Not found in archive\n", t_names[i]);
-            all_files_found = false;
-        }
-    }
+    // check and print files that we didn't encounter.
+    bool all_files_found = check_appearance(ARRAY_SIZE(appearance), appearance, t_names);
     my_dispose(tar_file, header);
-    if (!all_files_found) my_errx(2, PROGRAM_NAME": Exiting with failure status due to previous errors\n", 0);
+    if (!all_files_found)
+        my_errx(2, PROGRAM_NAME": Exiting with failure status due to previous errors\n", 0);
 }
