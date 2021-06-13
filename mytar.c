@@ -236,13 +236,14 @@ int main(int argc, char *argv[]) {
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
 
-        int skipped_res = fseek(tar_file, (long) (BLOCK_SIZE * blocks_to_skip), SEEK_CUR);
+        size_t skipped_res = fread(NULL, (long) (BLOCK_SIZE * blocks_to_skip),ONE,tar_file);
         // We reached the EOF sooner than we should.
         if (skipped_res != 0) {
             // TODO: hopefully right?
             free(header);
             fclose(tar_file);
-            my_errx(2, "Unexpected EOF in archive\n");
+            my_errx(2, "mytar: Unexpected EOF in archive\n"
+                       "mytar: Error is not recoverable: exiting now\n");
         }
         blocks_so_far += (blocks_to_skip + 1);
     }
