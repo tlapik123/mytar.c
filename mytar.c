@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
 
-        size_t skipped_res = fread(NULL, (long) (BLOCK_SIZE * blocks_to_skip),ONE,tar_file);
+        size_t skipped_res = fread(NULL, (BLOCK_SIZE * blocks_to_skip),ONE,tar_file);
         // We reached the EOF sooner than we should.
         if (skipped_res != 0) {
             // TODO: hopefully right?
