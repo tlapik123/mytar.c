@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
                 my_errx(0, formatted);
             }
             // We reached EOF without 2 empty blocks.
-            if(header_read_res == 0) break;
+            if (header_read_res == 0) break;
 
             free(header);
             fclose(tar_file);
@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
         }
 
         // We only care about regular files.
-        if (header->typeflag != '0') {
+        if (header->typeflag != '0' && header->typeflag != 0) {
             free(header);
             fclose(tar_file);
             const char *non_formatted = "mytar: Unsupported header type: %d\n";
@@ -236,15 +236,17 @@ int main(int argc, char *argv[]) {
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
 
-        size_t skipped_res = fread(NULL, (BLOCK_SIZE * blocks_to_skip),ONE,tar_file);
+        char tmp_block[BLOCK_SIZE * blocks_to_skip];
+        size_t skipped_res = fread(tmp_block, (BLOCK_SIZE * blocks_to_skip), ONE, tar_file);
         // We reached the EOF sooner than we should.
-        if (skipped_res != 0) {
+        if (skipped_res != ONE) {
             // TODO: hopefully right?
             free(header);
             fclose(tar_file);
             my_errx(2, "mytar: Unexpected EOF in archive\n"
                        "mytar: Error is not recoverable: exiting now\n");
         }
+        // Increment number of blocks encountered.
         blocks_so_far += (blocks_to_skip + 1);
     }
     bool all_files_found = true;
