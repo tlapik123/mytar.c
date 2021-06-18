@@ -240,10 +240,8 @@ int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
     const char *filename = NULL;
     const char *t_names[argc];
-    // Parse options.
     parse_options(--argc, ++argv, &filename, &t_names_actual_length, t_names);
 
-    // Open a tar file.
     FILE *tar_file = fopen(filename, "rb");
     // Some problem with file.
     if (tar_file == NULL) my_errx(2, "File couldn't be opened/wasn't found.\n", 0);
@@ -269,6 +267,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         // Read header
+        // TODO: refactor this
         size_t header_read_res = fread(header, ONE, sizeof(*header), tar_file);
         if (header_read_res != sizeof(*header)) {
             // We reached EOF and there was only one empty block.
@@ -324,7 +323,6 @@ int main(int argc, char *argv[]) {
             my_dispose(tar_file, header);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
-        // Increment number of blocks encountered.
         blocks_so_far += (blocks_to_skip + 1);
     }
     // check and print files that we didn't encounter.
