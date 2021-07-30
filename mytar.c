@@ -117,7 +117,6 @@ static bool is_block_empty(void *block) {
  */
 static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_to_free) {
     bool successful_close = true;
-    free(memory_to_free);
     int close_res;
 
     if (file1_to_close != NULL) {
@@ -128,6 +127,9 @@ static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_
         close_res = fclose(file2_to_close);
         if (close_res == EOF) successful_close = false;
     }
+
+    free(memory_to_free);
+
     if (!successful_close) my_errx(2, "File wasn't successfully closed!\n", 0);
 }
 
@@ -238,7 +240,7 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
 }
 
 // TODO move some content from main here
-static void* read_header() {}
+// static void* read_header() {}
 
 
 
@@ -251,7 +253,7 @@ int main(int argc, char *argv[]) {
     bool verbose = false;
     parse_options(--argc, ++argv, &filename, &t_names_actual_length, t_names, &extract, &verbose);
 
-    FILE *tar_file = fopen(filename, "rb");
+    FILE *tar_file = fopen(filename, "r");
     // Some problem with file.
     if (tar_file == NULL) my_errx(2, "File couldn't be opened/wasn't found.\n", 0);
     // Malloc space for header
@@ -342,10 +344,12 @@ int main(int argc, char *argv[]) {
         }
 
         // get and skip all the content
+        // TODO: if we are extracting get only necessary size, not everything!
         size_t content_block_count = number_of_content_blocks(header->size);
         size_t content_block_size = BLOCK_SIZE * content_block_count;
 
         // Need some variable to read to.
+        // TODO malloc this.
         char tmp_content_block[content_block_size];
         size_t content_block_res = fread(tmp_content_block, ONE, content_block_size, tar_file);
         // We reached the EOF sooner than we should.
@@ -360,6 +364,12 @@ int main(int argc, char *argv[]) {
             if (write_res != ONE){
                 my_dispose(tar_file, extractionFile, header);
                 my_errx(2, "Write to file was not successful\n", 0);
+            }
+            int close_res = fclose(extractionFile);
+            extractionFile = NULL;
+            if (close_res == EOF) {
+                my_dispose(tar_file, extractionFile, header);
+                my_errx(2, "File wasn't successfully closed!\n", 0);
             }
         }
 
