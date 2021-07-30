@@ -10,10 +10,11 @@
 #define OCTAL 8
 #define ONE 1
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#define SUPPORTED_OPTION_COUNT 2
+#define SUPPORTED_OPTION_COUNT 4
 #define PROGRAM_NAME "mytar"
 #define EOF_ERR PROGRAM_NAME": Unexpected EOF in archive\n"
 #define NON_RECOVERABLE_ERR PROGRAM_NAME": Error is not recoverable: exiting now\n"
+#define MAGIC "ustar "
 
 
 static inline size_t number_of_content_blocks(char size_as_string[]);
@@ -26,7 +27,8 @@ static bool is_block_empty(void *block);
 static void my_dispose(FILE *file_to_close, void *memory_to_free);
 
 static void
-parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[]);
+parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[],
+              bool *extract, bool *verbose);
 
 static inline bool is_name_in_list(const char *name, int array_end, const char *names[], bool appearances[]);
 
@@ -45,7 +47,7 @@ typedef struct {                    /* byte offset */
     char chksum[8];                 /* 148 */
     char typeflag;                  /* 156 */
     char linkname[100];             /* 157 */
-    char magic[6];                  /* 257 */
+    char magic[6]; // "ustar "     /* 257 */
     char version[2];                /* 263 */
     char uname[32];                 /* 265 */
     char gname[32];                 /* 297 */
@@ -120,17 +122,6 @@ static void my_dispose(FILE *file_to_close, void *memory_to_free) {
 }
 
 /**
- * What option is active
- */
-enum active_option {
-    NONE,
-    F,
-    T,
-    V,
-    X
-};
-
-/**
  * Parse command line arguments.
  * @param argc Number of actual arguments (without program name).
  * @param argv Arguments to parse.
@@ -139,58 +130,56 @@ enum active_option {
  * @param t_names Array of 't' option file names.
  */
 static void
-parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[]) {
+parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[],
+              bool *extract, bool *verbose) {
     if (argc < 3) {
         my_errx(2, "Need at least 3 arguments.\n", 0);
     }
-    // Current active option.
-    enum active_option active_o = NONE;
-    // 0th index:'f', 1st index:'t'
-    char option_decoder[] = {'f', 't'};
-    bool encountered_options[SUPPORTED_OPTION_COUNT] = {false};
+    char option_decoder[] = {'f', 't', 'x', 'v'};
+    bool encountered_o[SUPPORTED_OPTION_COUNT] = {false};
+    bool end_of_options = false;
     for (int i = 0; i < argc; ++i) {
         if (argv[i][0] == '-') {
+            // We(I) dont permit "-filename" as a name of the file - hence the error
+            if (end_of_options) my_errx(2, "Option encountered behind or between arguments.\n", 0);
             if (strlen(argv[i]) != 2) my_errx(2, "Long option %s encountered.\n", 1, argv[i]);
             switch (argv[i][1]) {
                 case 'f':
-                    encountered_options[0] = true;
-                    active_o = F;
+                    encountered_o[0] = true;
+                    // filename should be right behind it
+                    *filename = argv[++i];
                     continue;
                 case 't':
-                    encountered_options[1] = true;
-                    active_o = T;
+                    encountered_o[1] = true;
+                    continue;
+                case 'x':
+                    encountered_o[2] = true;
+                    *extract = true;
+                    continue;
+                case 'v':
+                    encountered_o[3] = true;
+                    *verbose = true;
                     continue;
                 default:
                     my_errx(2, "Unknown option.\n", 0);
             }
         }
-        switch (active_o) {
-            case F:
-                *filename = argv[i];
-                // If there was a 't' switch back to it.
-                active_o = encountered_options[1] ? T : NONE;
-                break;
-            case T:
-                // Add search name to the list.
-                t_names[*t_names_actual_length] = argv[i];
-                ++(*t_names_actual_length);
-                break;
-            case V:
-            case X:
-                my_errx(2, "Option not implemented.\n", 0);
-            case NONE:
-                my_errx(2, "Option missing!\n", 0);
-            default:
-                assert(false);
+        // collect arguments
+        else {
+            // just to error check if we encounter some options behind or between args
+            end_of_options = true;
+            // Add search name to the list.
+            t_names[*t_names_actual_length] = argv[i];
+            ++(*t_names_actual_length);
         }
     }
 
     // Check option dependency
-    for (size_t i = 0; i < ARRAY_SIZE(encountered_options); ++i) {
-        if (!encountered_options[i]) {
-            my_errx(2, "Option %c wasn't specified.\n", 1, option_decoder[i]);
-        }
-    }
+    if (!(encountered_o[0]))
+        my_errx(2, "Option %c wasn't specified!\n", 1, option_decoder[0]);
+    if (!(encountered_o[1] ^ encountered_o[2]))
+        my_errx(2, "Options %c and %c are mutually exclusive and/or at least one of them "
+                   "needs to be specified!\n", 1, option_decoder[1], option_decoder[2]);
 }
 
 /**
@@ -235,12 +224,17 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
     return all_files_found;
 }
 
+// TODO move some content from main here
+static void* read_header() {}
+
 
 int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
     const char *filename = NULL;
     const char *t_names[argc];
-    parse_options(--argc, ++argv, &filename, &t_names_actual_length, t_names);
+    bool extract = false;
+    bool verbose = false;
+    parse_options(--argc, ++argv, &filename, &t_names_actual_length, t_names, &extract, &verbose);
 
     FILE *tar_file = fopen(filename, "rb");
     // Some problem with file.
@@ -267,7 +261,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         // Read header
-        // TODO: refactor this
+        // TODO: refactor this - put it into a function?
         size_t header_read_res = fread(header, ONE, sizeof(*header), tar_file);
         if (header_read_res != sizeof(*header)) {
             // We reached EOF and there was only one empty block.
@@ -280,6 +274,12 @@ int main(int argc, char *argv[]) {
 
             my_dispose(tar_file, header);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
+        }
+
+        // Check that we are dealing with the tar file
+        if (strcmp(header->magic, MAGIC) != 0) {
+            fprintf(stderr, "This does not look like a tar archive");
+            break;
         }
 
         // Optimization - only if name is empty we check if block was empty.
@@ -306,11 +306,15 @@ int main(int argc, char *argv[]) {
         }
 
         // Find the name in 't' option list and if found (or list is nonexistent) print it.
+        // TODO: print also when verbose mode on X is on
         if (t_names_actual_length == 0 || is_name_in_list(header->name, t_names_actual_length, t_names, appearance)) {
             printf("%s\n", header->name);
             fflush(stdout);
         }
 
+        // TODO: create a file with the correct name
+
+        // TODO: skip content only if extract is false, otherwise write it to file.
         // get and skip all the content
         size_t blocks_to_skip = number_of_content_blocks(header->size);
         size_t size_to_skip = BLOCK_SIZE * blocks_to_skip;
