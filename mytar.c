@@ -228,7 +228,7 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
 static void* read_header() {}
 
 
-
+FILE* g_mytar_extraction_file;
 
 int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
@@ -278,12 +278,6 @@ int main(int argc, char *argv[]) {
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
 
-        // Check that we are dealing with the tar file
-        if (strcmp(header->magic, MAGIC) != 0) {
-            fprintf(stderr, PROGRAM_NAME": This does not look like a tar archive");
-            break;
-        }
-
         // Optimization - only if name is empty we check if block was empty.
         if (header->name[0] == '\0') {
             if (is_block_empty(header)) {
@@ -298,6 +292,12 @@ int main(int argc, char *argv[]) {
         if (empty_block_count != 0) {
             my_dispose(tar_file, header);
             my_errx(0, PROGRAM_NAME": A lone zero block at %zu\n", 1, (blocks_so_far + 1));
+        }
+
+        // Check that we are dealing with the tar file
+        if (strncmp(header->magic, MAGIC, ARRAY_SIZE(header->magic)) != 0) {
+            fprintf(stderr, PROGRAM_NAME": This does not look like a tar archive");
+            break;
         }
 
         // We only care about regular files.
@@ -317,23 +317,38 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        // create a file with the correct name for extracting
+        if (extract) {
+            g_mytar_extraction_file = fopen(header->name, "w");
+            if (g_mytar_extraction_file == NULL) {
+                my_dispose(tar_file,header);
+                my_errx(2, "Couldn't open a file to write to.", 0);
+            }
+        }
 
-        // TODO: create a file with the correct name
-
-        // TODO: skip content only if extract is false, otherwise write it to file.
         // get and skip all the content
-        size_t blocks_to_skip = number_of_content_blocks(header->size);
-        size_t size_to_skip = BLOCK_SIZE * blocks_to_skip;
+        size_t content_block_count = number_of_content_blocks(header->size);
+        size_t content_block_size = BLOCK_SIZE * content_block_count;
 
         // Need some variable to read to.
-        char tmp_block[size_to_skip];
-        size_t skipped_res = fread(tmp_block, ONE, size_to_skip, tar_file);
+        char tmp_content_block[content_block_size];
+        size_t content_block_res = fread(tmp_content_block, ONE, content_block_size, tar_file);
         // We reached the EOF sooner than we should.
-        if (skipped_res != size_to_skip) {
+        if (content_block_res != content_block_size) {
             my_dispose(tar_file, header);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
-        blocks_so_far += (blocks_to_skip + 1);
+
+        // write content to file if we are in extract mode
+        if (extract){
+            size_t write_res = fwrite(tmp_content_block, BLOCK_SIZE, ONE, g_mytar_extraction_file);
+            if (write_res != ONE){
+                my_dispose(tar_file,header);
+                my_errx(2, "Write to file was not successful\n", 0);
+            }
+        }
+
+        blocks_so_far += (content_block_count + 1);
     }
     // check and print files that we didn't encounter.
     bool all_files_found = check_appearance(ARRAY_SIZE(appearance), appearance, t_names);
