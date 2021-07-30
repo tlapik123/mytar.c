@@ -228,6 +228,8 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
 static void* read_header() {}
 
 
+
+
 int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
     const char *filename = NULL;
@@ -278,7 +280,7 @@ int main(int argc, char *argv[]) {
 
         // Check that we are dealing with the tar file
         if (strcmp(header->magic, MAGIC) != 0) {
-            fprintf(stderr, "This does not look like a tar archive");
+            fprintf(stderr, PROGRAM_NAME": This does not look like a tar archive");
             break;
         }
 
@@ -305,12 +307,16 @@ int main(int argc, char *argv[]) {
             my_errx(2, PROGRAM_NAME": Unsupported header type: %d\n", 1, type_flag);
         }
 
-        // Find the name in 't' option list and if found (or list is nonexistent) print it.
-        // TODO: print also when verbose mode on X is on
-        if (t_names_actual_length == 0 || is_name_in_list(header->name, t_names_actual_length, t_names, appearance)) {
-            printf("%s\n", header->name);
-            fflush(stdout);
+
+        // verbose needs to be specified for printing when extract is in effect.
+        if (verbose || !extract){
+            // Find the name in 't' option list and if found (or list is nonexistent) print it.
+            if (t_names_actual_length == 0 || is_name_in_list(header->name, t_names_actual_length, t_names, appearance)) {
+                printf("%s\n", header->name);
+                fflush(stdout);
+            }
         }
+
 
         // TODO: create a file with the correct name
 
