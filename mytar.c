@@ -24,7 +24,7 @@ static void my_errx(int return_code, char return_string[], int va_count, ...);
 
 static bool is_block_empty(void *block);
 
-static void my_dispose(FILE *file_to_close, void *memory_to_free);
+static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_to_free);
 
 static void
 parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[],
@@ -115,11 +115,24 @@ static bool is_block_empty(void *block) {
  * @param file_to_close File in need of closing.
  * @param memory_to_free Memory in need of freeing.
  */
-static void my_dispose(FILE *file_to_close, void *memory_to_free) {
+static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_to_free) {
+    bool successful_close = true;
     free(memory_to_free);
-    int close_res = fclose(file_to_close);
-    if (close_res == EOF) my_errx(2, "File wasn't successfully closed!\n", 0);
+    int close_res;
+
+    if (file1_to_close != NULL) {
+        close_res = fclose(file1_to_close);
+        if (close_res == EOF) successful_close = false;
+    }
+    if (file2_to_close != NULL){
+        close_res = fclose(file2_to_close);
+        if (close_res == EOF) successful_close = false;
+    }
+    if (!successful_close) my_errx(2, "File wasn't successfully closed!\n", 0);
 }
+
+
+
 
 /**
  * Parse command line arguments.
@@ -228,7 +241,7 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
 static void* read_header() {}
 
 
-FILE* g_mytar_extraction_file;
+FILE* g_mytar_extraction_file = NULL;
 
 int main(int argc, char *argv[]) {
     int t_names_actual_length = 0;
@@ -268,13 +281,13 @@ int main(int argc, char *argv[]) {
         if (header_read_res != sizeof(*header)) {
             // We reached EOF and there was only one empty block.
             if (empty_block_count != 0) {
-                my_dispose(tar_file, header);
+                my_dispose(tar_file, g_mytar_extraction_file, header);
                 my_errx(0, PROGRAM_NAME": A lone zero block at %zu\n", 1, (blocks_so_far + 1));
             }
             // We reached EOF without 2 empty blocks.
             if (header_read_res == 0) break;
 
-            my_dispose(tar_file, header);
+            my_dispose(tar_file, g_mytar_extraction_file, header);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
 
@@ -284,13 +297,13 @@ int main(int argc, char *argv[]) {
                 ++empty_block_count;
                 continue;
             }
-            my_dispose(tar_file, header);
+            my_dispose(tar_file, g_mytar_extraction_file, header);
             my_errx(2, "Non recognizable header.\n", 0);
         }
 
         // We encountered empty block but there wasn't a second one or EOF
         if (empty_block_count != 0) {
-            my_dispose(tar_file, header);
+            my_dispose(tar_file, g_mytar_extraction_file, header);
             my_errx(0, PROGRAM_NAME": A lone zero block at %zu\n", 1, (blocks_so_far + 1));
         }
 
@@ -303,7 +316,7 @@ int main(int argc, char *argv[]) {
         // We only care about regular files.
         if (header->typeflag != '0' && header->typeflag != 0) {
             char type_flag = header->typeflag;
-            my_dispose(tar_file, header);
+            my_dispose(tar_file, g_mytar_extraction_file, header);
             my_errx(2, PROGRAM_NAME": Unsupported header type: %d\n", 1, type_flag);
         }
 
@@ -321,7 +334,7 @@ int main(int argc, char *argv[]) {
         if (extract) {
             g_mytar_extraction_file = fopen(header->name, "w");
             if (g_mytar_extraction_file == NULL) {
-                my_dispose(tar_file,header);
+                my_dispose(tar_file, g_mytar_extraction_file, header);
                 my_errx(2, "Couldn't open a file to write to.", 0);
             }
         }
@@ -335,7 +348,7 @@ int main(int argc, char *argv[]) {
         size_t content_block_res = fread(tmp_content_block, ONE, content_block_size, tar_file);
         // We reached the EOF sooner than we should.
         if (content_block_res != content_block_size) {
-            my_dispose(tar_file, header);
+            my_dispose(tar_file, g_mytar_extraction_file, header);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
 
@@ -343,7 +356,7 @@ int main(int argc, char *argv[]) {
         if (extract){
             size_t write_res = fwrite(tmp_content_block, BLOCK_SIZE, ONE, g_mytar_extraction_file);
             if (write_res != ONE){
-                my_dispose(tar_file,header);
+                my_dispose(tar_file, g_mytar_extraction_file, header);
                 my_errx(2, "Write to file was not successful\n", 0);
             }
         }
@@ -352,7 +365,7 @@ int main(int argc, char *argv[]) {
     }
     // check and print files that we didn't encounter.
     bool all_files_found = check_appearance(ARRAY_SIZE(appearance), appearance, t_names);
-    my_dispose(tar_file, header);
+    my_dispose(tar_file, g_mytar_extraction_file, header);
     if (!all_files_found)
         my_errx(2, PROGRAM_NAME": Exiting with failure status due to previous errors\n", 0);
 }
