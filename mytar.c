@@ -15,6 +15,7 @@
 #define EOF_ERR PROGRAM_NAME": Unexpected EOF in archive\n"
 #define NON_RECOVERABLE_ERR PROGRAM_NAME": Error is not recoverable: exiting now\n"
 #define MAGIC "ustar "
+#define SIZE_OF_CONTENT(x) (strtoul(size_as_string, NULL, OCTAL))
 
 
 static inline size_t number_of_content_blocks(char size_as_string[]);
@@ -57,6 +58,15 @@ typedef struct {                    /* byte offset */
     char empty[12];                 /* 500 */
     /* 512 */
 } whole_header;
+
+/**
+ * Managed resourc_struct
+ */
+typedef struct {
+    FILE *tar_file;
+    FILE *extract_file;
+    whole_header *header;
+} resourc_struct;
 
 /**
  * Get number of content blocks.
@@ -129,6 +139,27 @@ static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_
     }
 
     free(memory_to_free);
+
+    if (!successful_close) my_errx(2, "File wasn't successfully closed!\n", 0);
+}
+
+/**
+ * Closes files and frees the memory.
+ * @param resources Resources to dispose.
+ */
+static void my_better_dispose(resourc_struct *resources){
+    bool successful_close = true;
+    int close_res;
+
+    if (resources->extract_file != NULL) {
+        close_res = fclose(resources->extract_file);
+        if (close_res == EOF) successful_close = false;
+    }
+    if (resources->tar_file != NULL){
+        close_res = fclose(resources->tar_file);
+        if (close_res == EOF) successful_close = false;
+    }
+    free(resources->header);
 
     if (!successful_close) my_errx(2, "File wasn't successfully closed!\n", 0);
 }
@@ -348,8 +379,38 @@ int main(int argc, char *argv[]) {
         size_t content_block_count = number_of_content_blocks(header->size);
         size_t content_block_size = BLOCK_SIZE * content_block_count;
 
+        char* tmp_content_block = malloc(BLOCK_SIZE);
+        if(tmp_content_block == NULL) {
+            my_dispose(tar_file, extractionFile, header);
+            my_errx(2, "Malloc allocation returned NULL.\n", 0);
+        }
+
+        for (size_t i = 0; i < content_block_count; ++i) {
+            size_t content_block_res = fread(tmp_content_block, BLOCK_SIZE, ONE, tar_file);
+            // We reached the EOF sooner than we should.
+            if (content_block_res != content_block_size) {
+                my_dispose(tar_file, extractionFile, header); // TODO dispose tmp_content_block
+                my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
+            }
+            // write content to file if we are in extract mode
+            if (extract){
+                size_t write_res = fwrite(tmp_content_block, BLOCK_SIZE, ONE, extractionFile);
+                if (write_res != ONE){
+                    my_dispose(tar_file, extractionFile, header);  // TODO dispose tmp_content_block
+                    my_errx(2, "Write to file was not successful\n", 0);
+                }
+                int close_res = fclose(extractionFile);
+                extractionFile = NULL;
+                if (close_res == EOF) {
+                    my_dispose(tar_file, extractionFile, header);  // TODO dispose tmp_content_block
+                    my_errx(2, "File wasn't successfully closed!\n", 0);
+                }
+            }
+        }
+
+        /*
         // Need some variable to read to.
-        // TODO malloc this.
+        // TODO: clean up - if we dont really need this?
         char tmp_content_block[content_block_size];
         size_t content_block_res = fread(tmp_content_block, ONE, content_block_size, tar_file);
         // We reached the EOF sooner than we should.
@@ -357,21 +418,7 @@ int main(int argc, char *argv[]) {
             my_dispose(tar_file, extractionFile, header);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
-
-        // write content to file if we are in extract mode
-        if (extract){
-            size_t write_res = fwrite(tmp_content_block, BLOCK_SIZE, ONE, extractionFile);
-            if (write_res != ONE){
-                my_dispose(tar_file, extractionFile, header);
-                my_errx(2, "Write to file was not successful\n", 0);
-            }
-            int close_res = fclose(extractionFile);
-            extractionFile = NULL;
-            if (close_res == EOF) {
-                my_dispose(tar_file, extractionFile, header);
-                my_errx(2, "File wasn't successfully closed!\n", 0);
-            }
-        }
+        */
 
         blocks_so_far += (content_block_count + 1);
     }
