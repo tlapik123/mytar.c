@@ -25,7 +25,7 @@ static void my_errx(int return_code, char return_string[], int va_count, ...);
 
 static bool is_block_empty(void *block);
 
-static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_to_free);
+static void my_dispose(FILE *file1_to_close, FILE *file2_to_close);
 
 static void
 parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[],
@@ -126,7 +126,7 @@ static bool is_block_empty(void *block) {
  * @param file_to_close File in need of closing.
  * @param memory_to_free Memory in need of freeing.
  */
-static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_to_free) {
+static void my_dispose(FILE *file1_to_close, FILE *file2_to_close) {
     bool successful_close = true;
     int close_res;
 
@@ -139,15 +139,13 @@ static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_
         if (close_res == EOF) successful_close = false;
     }
 
-    free(memory_to_free);
-
     if (!successful_close) my_errx(2, "Fclose failed!\n", 0);
 }
 
 /**
  * Closes files and frees the memory.
  * @param resources Resources to dispose.
- */
+
 static void my_better_dispose(resource_struct *resources){
     bool successful_close = true;
     int close_res;
@@ -164,7 +162,7 @@ static void my_better_dispose(resource_struct *resources){
 
     if (!successful_close) my_errx(2, "File wasn't successfully closed!\n", 0);
 }
-
+*/
 
 
 
@@ -278,13 +276,14 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
 /**
  * Initializes resource struct.
  * @return Pointer to allocated memory. If failed, returns NULL.
- */
+
 static inline resource_struct* initialize_resource_struct(){
 
 }
-
+*/
 
 int main(int argc, char *argv[]) {
+    bool previous_errors = false;
     int t_names_actual_length = 0;
     const char *filename = NULL;
     const char *t_names[argc];
@@ -295,12 +294,7 @@ int main(int argc, char *argv[]) {
     FILE *tar_file = fopen(filename, "r");
     // Some problem with file.
     if (tar_file == NULL) my_errx(2, "File couldn't be opened/wasn't found.\n", 0);
-    // Malloc space for header
-    whole_header *header = malloc(sizeof(whole_header));
-    if (header == NULL) {
-        fclose(tar_file);
-        my_errx(2, "Malloc returned NULL.\n", 0);
-    }
+    whole_header header = {0};
 
     // Files that we found.
     bool appearance[t_names_actual_length];
@@ -320,46 +314,47 @@ int main(int argc, char *argv[]) {
         }
         // Read header
         // TODO: refactor this - put it into a function?
-        size_t header_read_res = fread(header, 1, sizeof(*header), tar_file);
-        if (header_read_res != sizeof(*header)) {
+        size_t header_read_res = fread(&header, sizeof(header), ONE, tar_file);
+        if (header_read_res != ONE) {
             // We reached EOF and there was only one empty block.
             if (empty_block_count != 0) {
-                my_dispose(tar_file, extractionFile, header);
+                my_dispose(tar_file, extractionFile);
                 my_errx(0, PROGRAM_NAME": A lone zero block at %zu\n", 1, (blocks_so_far + 1));
             }
             // We reached EOF without 2 empty blocks.
             if (header_read_res == 0) break;
 
-            my_dispose(tar_file, extractionFile, header);
+            my_dispose(tar_file, extractionFile);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
         }
 
         // Optimization - only if name is empty we check if block was empty.
-        if (header->name[0] == '\0') {
-            if (is_block_empty(header)) {
+        if (header.name[0] == '\0') {
+            if (is_block_empty(&header)) {
                 ++empty_block_count;
                 continue;
             }
-            my_dispose(tar_file, extractionFile, header);
+            my_dispose(tar_file, extractionFile);
             my_errx(2, "Non recognizable header.\n", 0);
         }
 
         // We encountered empty block but there wasn't a second one or EOF
         if (empty_block_count != 0) {
-            my_dispose(tar_file, extractionFile, header);
+            my_dispose(tar_file, extractionFile);
             my_errx(0, PROGRAM_NAME": A lone zero block at %zu\n", 1, (blocks_so_far + 1));
         }
 
         // Check that we are dealing with the tar file
-        if (strncmp(header->magic, MAGIC, ARRAY_SIZE(header->magic)) != 0) {
-            fprintf(stderr, PROGRAM_NAME": This does not look like a tar archive");
+        if (strncmp(header.magic, MAGIC, ARRAY_SIZE(header.magic)) != 0) {
+            fprintf(stderr, PROGRAM_NAME": This does not look like a tar archive\n");
+            previous_errors = true;
             break;
         }
 
         // We only care about regular files.
-        if (header->typeflag != '0' && header->typeflag != 0) {
-            char type_flag = header->typeflag;
-            my_dispose(tar_file, extractionFile, header);
+        if (header.typeflag != '0' && header.typeflag != 0) {
+            char type_flag = header.typeflag;
+            my_dispose(tar_file, extractionFile);
             my_errx(2, PROGRAM_NAME": Unsupported header type: %d\n", 1, type_flag);
         }
 
@@ -367,67 +362,57 @@ int main(int argc, char *argv[]) {
         // verbose needs to be specified for printing when extract is in effect.
         if (verbose || !extract){
             // Find the name in 't' option list and if found (or list is nonexistent) print it.
-            if (t_names_actual_length == 0 || is_name_in_list(header->name, t_names_actual_length, t_names, appearance)) {
-                printf("%s\n", header->name);
+            if (t_names_actual_length == 0 || is_name_in_list(header.name, t_names_actual_length, t_names, appearance)) {
+                printf("%s\n", header.name);
                 fflush(stdout);
             }
         }
 
         // create a file with the correct name for extracting
         if (extract) {
-            extractionFile = fopen(header->name, "w");
+            extractionFile = fopen(header.name, "w");
             if (extractionFile == NULL) {
-                my_dispose(tar_file, extractionFile, header);
+                my_dispose(tar_file, extractionFile);
                 my_errx(2, "Couldn't open a file to write to.", 0);
             }
         }
 
         // get and skip all the content
         // TODO: if we are extracting get only necessary size, not everything!
-        size_t content_block_count = number_of_content_blocks(header->size);
+        size_t content_block_count = number_of_content_blocks(header.size);
 
-        char* tmp_content_block[BLOCK_SIZE];
+        char tmp_content_block[BLOCK_SIZE];
 
         for (size_t i = 0; i < content_block_count; ++i) {
             size_t content_block_res = fread(tmp_content_block, BLOCK_SIZE, ONE, tar_file);
             // We reached the EOF sooner than we should.
             if (content_block_res != ONE) {
-                my_dispose(tar_file, extractionFile, header);
+                my_dispose(tar_file, extractionFile);
                 my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
             }
             // write content to file if we are in extract mode
             if (extract){
                 size_t write_res = fwrite(tmp_content_block, BLOCK_SIZE, ONE, extractionFile);
                 if (write_res != ONE){
-                    my_dispose(tar_file, extractionFile, header);
+                    my_dispose(tar_file, extractionFile);
                     my_errx(2, "Write to file was not successful\n", 0);
-                }
-                int close_res = fclose(extractionFile);
-                extractionFile = NULL;
-                if (close_res == EOF) {
-                    my_dispose(tar_file, extractionFile, header);
-                    my_errx(2, "File wasn't successfully closed!\n", 0);
                 }
             }
         }
-
-        /*
-        // Need some variable to read to.
-        // TODO: clean up - if we dont really need this?
-        char tmp_content_block[content_block_size];
-        size_t content_block_res = fread(tmp_content_block, ONE, content_block_size, tar_file);
-        // We reached the EOF sooner than we should.
-        if (content_block_res != content_block_size) {
-            my_dispose(tar_file, extractionFile, header);
-            my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
+        if(extract){
+            int close_res = fclose(extractionFile);
+            extractionFile = NULL;
+            if (close_res == EOF) {
+                my_dispose(tar_file, extractionFile);
+                my_errx(2, "File wasn't successfully closed!\n", 0);
+            }
         }
-        */
 
         blocks_so_far += (content_block_count + 1);
     }
     // check and print files that we didn't encounter.
     bool all_files_found = check_appearance(ARRAY_SIZE(appearance), appearance, t_names);
-    my_dispose(tar_file, extractionFile, header);
-    if (!all_files_found)
+    my_dispose(tar_file, extractionFile);
+    if (!all_files_found || previous_errors)
         my_errx(2, PROGRAM_NAME": Exiting with failure status due to previous errors\n", 0);
 }
