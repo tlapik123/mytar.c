@@ -66,7 +66,8 @@ typedef struct {
     FILE *tar_file;
     FILE *extract_file;
     whole_header *header;
-} resourc_struct;
+    char *content_block;
+} resource_struct;
 
 /**
  * Get number of content blocks.
@@ -140,14 +141,14 @@ static void my_dispose(FILE *file1_to_close, FILE *file2_to_close, void *memory_
 
     free(memory_to_free);
 
-    if (!successful_close) my_errx(2, "File wasn't successfully closed!\n", 0);
+    if (!successful_close) my_errx(2, "Fclose failed!\n", 0);
 }
 
 /**
  * Closes files and frees the memory.
  * @param resources Resources to dispose.
  */
-static void my_better_dispose(resourc_struct *resources){
+static void my_better_dispose(resource_struct *resources){
     bool successful_close = true;
     int close_res;
 
@@ -274,6 +275,13 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
 // static void* read_header() {}
 
 
+/**
+ * Initializes resource struct.
+ * @return Pointer to allocated memory. If failed, returns NULL.
+ */
+static inline resource_struct* initialize_resource_struct(){
+
+}
 
 
 int main(int argc, char *argv[]) {
@@ -312,7 +320,7 @@ int main(int argc, char *argv[]) {
         }
         // Read header
         // TODO: refactor this - put it into a function?
-        size_t header_read_res = fread(header, ONE, sizeof(*header), tar_file);
+        size_t header_read_res = fread(header, 1, sizeof(*header), tar_file);
         if (header_read_res != sizeof(*header)) {
             // We reached EOF and there was only one empty block.
             if (empty_block_count != 0) {
@@ -377,32 +385,27 @@ int main(int argc, char *argv[]) {
         // get and skip all the content
         // TODO: if we are extracting get only necessary size, not everything!
         size_t content_block_count = number_of_content_blocks(header->size);
-        size_t content_block_size = BLOCK_SIZE * content_block_count;
 
-        char* tmp_content_block = malloc(BLOCK_SIZE);
-        if(tmp_content_block == NULL) {
-            my_dispose(tar_file, extractionFile, header);
-            my_errx(2, "Malloc allocation returned NULL.\n", 0);
-        }
+        char* tmp_content_block[BLOCK_SIZE];
 
         for (size_t i = 0; i < content_block_count; ++i) {
             size_t content_block_res = fread(tmp_content_block, BLOCK_SIZE, ONE, tar_file);
             // We reached the EOF sooner than we should.
-            if (content_block_res != content_block_size) {
-                my_dispose(tar_file, extractionFile, header); // TODO dispose tmp_content_block
+            if (content_block_res != ONE) {
+                my_dispose(tar_file, extractionFile, header);
                 my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
             }
             // write content to file if we are in extract mode
             if (extract){
                 size_t write_res = fwrite(tmp_content_block, BLOCK_SIZE, ONE, extractionFile);
                 if (write_res != ONE){
-                    my_dispose(tar_file, extractionFile, header);  // TODO dispose tmp_content_block
+                    my_dispose(tar_file, extractionFile, header);
                     my_errx(2, "Write to file was not successful\n", 0);
                 }
                 int close_res = fclose(extractionFile);
                 extractionFile = NULL;
                 if (close_res == EOF) {
-                    my_dispose(tar_file, extractionFile, header);  // TODO dispose tmp_content_block
+                    my_dispose(tar_file, extractionFile, header);
                     my_errx(2, "File wasn't successfully closed!\n", 0);
                 }
             }
