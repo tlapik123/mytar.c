@@ -15,7 +15,6 @@
 #define EOF_ERR PROGRAM_NAME": Unexpected EOF in archive\n"
 #define NON_RECOVERABLE_ERR PROGRAM_NAME": Error is not recoverable: exiting now\n"
 #define MAGIC "ustar "
-#define SIZE_OF_CONTENT(x) (strtoul(size_as_string, NULL, OCTAL))
 
 
 static inline size_t number_of_content_blocks(char size_as_string[]);
@@ -24,8 +23,6 @@ __attribute__((noreturn))
 static void my_errx(int return_code, char return_string[], int va_count, ...);
 
 static bool is_block_empty(void *block);
-
-static void my_dispose(FILE *file1_to_close, FILE *file2_to_close);
 
 static void
 parse_options(int argc, char *argv[], const char **filename, int *t_names_actual_length, const char *t_names[],
@@ -58,16 +55,6 @@ typedef struct {                    /* byte offset */
     char empty[12];                 /* 500 */
     /* 512 */
 } whole_header;
-
-/**
- * Managed resourc_struct
- */
-typedef struct {
-    FILE *tar_file;
-    FILE *extract_file;
-    whole_header *header;
-    char *content_block;
-} resource_struct;
 
 /**
  * Get number of content blocks.
@@ -225,19 +212,6 @@ static inline bool check_appearance(size_t length, const bool appearance[], cons
     return all_files_found;
 }
 
-// TODO move some content from main here
-// static void* read_header() {}
-
-
-/**
- * Initializes resource struct.
- * @return Pointer to allocated memory. If failed, returns NULL.
-
-static inline resource_struct* initialize_resource_struct(){
-
-}
-*/
-
 int main(int argc, char *argv[]) {
     bool previous_errors = false;
     int t_names_actual_length = 0;
@@ -269,16 +243,16 @@ int main(int argc, char *argv[]) {
             break;
         }
         // Read header
-        // TODO: refactor this - put it into a function?
-        size_t header_read_res = fread(&header, sizeof(header), ONE, tar_file);
-        if (header_read_res != ONE) {
+        size_t header_size = sizeof(header);
+        size_t header_read_res = fread(&header, 1, header_size, tar_file);
+        if (header_read_res != header_size) {
             // We reached EOF and there was only one empty block.
-            if (empty_block_count != 0) {
+            if (empty_block_count == 1) {
                 fclose(tar_file);
                 my_errx(0, PROGRAM_NAME": A lone zero block at %zu\n", 1, (blocks_so_far + 1));
             }
             // We reached EOF without 2 empty blocks.
-            if (header_read_res == 0) break;
+            if (empty_block_count == 0 && header_read_res == 0) break;
 
             fclose(tar_file);
             my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
@@ -334,18 +308,15 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // get and skip all the content
-        // TODO: if we are extracting get only necessary size, not everything!
         size_t content_block_count = number_of_content_blocks(header.size);
-
         char tmp_content_block[BLOCK_SIZE];
 
         for (size_t i = 0; i < content_block_count; ++i) {
             size_t content_block_res = fread(tmp_content_block, BLOCK_SIZE, ONE, tar_file);
             // We reached the EOF sooner than we should.
             if (content_block_res != ONE) {
+                if (extractionFile != NULL) fclose(extractionFile);
                 fclose(tar_file);
-                fclose(extractionFile);
                 my_errx(2, EOF_ERR NON_RECOVERABLE_ERR, 0);
             }
             // write content to file if we are in extract mode
@@ -360,7 +331,6 @@ int main(int argc, char *argv[]) {
         }
         if (extract) {
             int close_res = fclose(extractionFile);
-            extractionFile = NULL;
             if (close_res == EOF) {
                 fclose(tar_file);
                 my_errx(2, "File wasn't successfully closed!\n", 0);
